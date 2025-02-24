@@ -26,10 +26,10 @@
 + (void)load {
     NSLog(@"[NoReels] Loaded");
     
-//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
-//                   dispatch_get_main_queue(), ^{
-//        [FLEXManager.sharedManager showExplorer];
-//    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [FLEXManager.sharedManager showExplorer];
+    });
     
     dispatch_async(dispatch_get_main_queue(), ^{
         [[self sharedInstance] startReplaceTimer];
@@ -51,14 +51,14 @@
 
 /**
  -startReplaceTimer
- Starts a timer that fires every second to scan and hide unwanted views.
+ Starts a timer that fires every 0.5s to scan and hide unwanted views.
  */
 - (void)startReplaceTimer {
     if (self.replaceTimer) {
         [self.replaceTimer invalidate];
         self.replaceTimer = nil;
     }
-    self.replaceTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 // 1 second
+    self.replaceTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
                                                          target:self
                                                        selector:@selector(scanAndHideUnwantedViews)
                                                        userInfo:nil
@@ -79,8 +79,8 @@
  -processView:
  Recursively scans a view’s subviews to:
  • Replace any IGTabBarButton that shows “Reels” with a disabled middle-finger button.
- • Hide any IGFNFVideoView.
- • Hide UICollectionViews whose data source class name indicates suggestions.
+ • Hide any IGModernFeedVideoCell.IGModernFeedVideoCell.
+ • Hide UICollectionView
  @param view The view to process.
  */
 - (void)processView:(UIView *)view {
@@ -103,21 +103,28 @@
             }
         }
         
-        // Hide any IGFNFVideoView.
-        if ([subview isKindOfClass:NSClassFromString(@"IGFNFVideoView")]) {
-            NSLog(@"[NoReels] Hiding IGFNFVideoView: %@", subview);
+        // Hide any IGModernFeedVideoCell.IGModernFeedVideoCell.
+        if ([subview isKindOfClass:NSClassFromString(@"IGModernFeedVideoCell.IGModernFeedVideoCell")]) {
+            if ([subview.superview isKindOfClass:NSClassFromString(@"IGCarouselCollectionView")]) {
+            NSLog(@"[NoReels] Found IGModernFeedVideoCell.IGModernFeedVideoCell inside IGCarouselCollectionView, not hiding.");
+            } else {
+            NSLog(@"[NoReels] Hiding IGModernFeedVideoCell.IGModernFeedVideoCell: %@", subview);
             subview.hidden = YES;
+            }
         }
         
-        // Hide UICollectionViews showing suggestions.
-        if ([subview isKindOfClass:[UICollectionView class]]) {
-            NSString *dsClass = @"";
-            if ([subview respondsToSelector:@selector(dataSource)] && [subview performSelector:@selector(dataSource)]) {
-                dsClass = [NSStringFromClass([[subview performSelector:@selector(dataSource)] class]) lowercaseString];
+        Hide UICollectionViews showing suggestions.
+        if ([subview isKindOfClass:NSClassFromString(@"UICollectionView")]) {
+            BOOL containsClipCell = NO;
+            for (UIView *collectionSubview in subview.subviews) {
+            if ([collectionSubview isKindOfClass:NSClassFromString(@"IGFeedPlayableClipCell")]) {
+                containsClipCell = YES;
+                break;
             }
-            if ([dsClass containsString:@"suggestions"]) {
-                NSLog(@"[NoReels] Hiding UICollectionView with suggestions dataSource: %@", subview);
-                subview.hidden = YES;
+            }
+            if (containsClipCell) {
+            NSLog(@"[NoReels] Hiding suggestions: %@", subview);
+            subview.hidden = YES;
             }
         }
         
@@ -198,75 +205,6 @@
         replacement.backgroundColor = [UIColor whiteColor];
         self.view = replacement;
     }
-}
-
-@end
-
-#pragma mark - UICollectionView (NoSuggestions)
-@implementation UICollectionView (NoSuggestions)
-
-/**
- +load
- Swizzles setDataSource: for UICollectionView to hide views with a data source containing "suggestions".
- */
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = [self class];
-        SEL originalSel = @selector(setDataSource:);
-        SEL swizzledSel = @selector(swizzled_setDataSource:);
-        Method originalMethod = class_getInstanceMethod(cls, originalSel);
-        Method swizzledMethod = class_getInstanceMethod(cls, swizzledSel);
-        method_exchangeImplementations(originalMethod, swizzledMethod);
-    });
-}
-
-/**
- -swizzled_setDataSource:
- Calls the original setDataSource:, then hides the UICollectionView if the data source’s class name contains "suggestions".
- */
-- (void)swizzled_setDataSource:(id<UICollectionViewDataSource>)dataSource {
-    [self swizzled_setDataSource:dataSource]; // Call original implementation.
-    
-    NSString *dsClass = [NSStringFromClass([dataSource class]) lowercaseString];
-    NSLog(@"[NoReels] UICollectionView dataSource: %@", dsClass);
-    if ([dsClass containsString:@"suggestions"]) {
-        NSLog(@"[NoReels] Hiding UICollectionView with suggestions dataSource: %@", self);
-        self.hidden = YES;
-    }
-}
-
-@end
-
-#pragma mark - UILabel (NoSuggestedReels)
-@implementation UILabel (NoSuggestedReels)
-
-/**
- +load
- Swizzles setText: for UILabel to hide any label displaying "suggested reels".
- */
-+ (void)load {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Class cls = [self class];
-        SEL originalSel = @selector(setText:);
-        SEL swizzledSel = @selector(swizzled_setText:);
-        Method originalMethod = class_getInstanceMethod(cls, originalSel);
-        Method swizzledMethod = class_getInstanceMethod(cls, swizzledSel);
-        method_exchangeImplementations(originalMethod, swizzledMethod);
-    });
-}
-
-/**
- -swizzled_setText:
- Hides the label if its text contains "suggested reels", then calls the original setText:.
- */
-- (void)swizzled_setText:(NSString *)text {
-    if ([[text lowercaseString] containsString:@"suggested reels"]) {
-        NSLog(@"[NoReels] Hiding UILabel with text: %@", text);
-        self.hidden = YES;
-    }
-    [self swizzled_setText:text]; // Call original implementation.
 }
 
 @end
