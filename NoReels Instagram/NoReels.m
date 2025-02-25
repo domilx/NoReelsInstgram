@@ -16,10 +16,10 @@
 /// Starts FLEX explorer after 2s and begins scanning views.
 + (void)load {
     NSLog(@"[NoReels] Loaded");
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
-                   dispatch_get_main_queue(), ^{
-        [FLEXManager.sharedManager showExplorer];
-    });
+//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+//                   dispatch_get_main_queue(), ^{
+//        [FLEXManager.sharedManager showExplorer];
+//    });
     dispatch_async(dispatch_get_main_queue(), ^{
         [[self sharedInstance] startTimer];
     });
